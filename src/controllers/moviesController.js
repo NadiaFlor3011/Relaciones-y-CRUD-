@@ -2,6 +2,8 @@ const path = require('path');
 const db = require('../database/models');
 const sequelize = db.sequelize;
 const { Op } = require("sequelize");
+const moment = require('moment');
+
 
 
 //Aqui tienen una forma de llamar a cada uno de los modelos
@@ -21,10 +23,21 @@ const moviesController = {
             })
     },
     'detail': (req, res) => {
-        db.Movie.findByPk(req.params.id)
-            .then(movie => {
-                res.render('moviesDetail.ejs', {movie});
-            });
+        
+            db.Movie.findByPk(req.params.id, {
+                include : [
+                    {
+                        association : 'genre'
+                    },
+                    {
+                        association : 'actors'
+                    }
+                ]
+            })
+                .then(movie => {
+                    res.render('moviesDetail.ejs', {
+                        movie});
+                });
     },
     'new': (req, res) => {
         db.Movie.findAll({
@@ -52,23 +65,89 @@ const moviesController = {
     },
     //Aqui dispongo las rutas para trabajar con el CRUD
     add: function (req, res) {
-        
+        db.Genre.findAll({
+            order : ['name']
+        })
+        .then(allGenres => {
+            res.render('moviesAdd',{
+                allGenres
+            })
+        })
+        .catch(error => console.log(error));
     },
     create: function (req,res) {
-
+    
+        db.Movie.create({
+            ...req.body,
+            title : req.body.title.trim()
+        }).then(movie =>{
+            console.log(movie);
+            res.redirect('/detail' + movie.id);
+        })
+        .catch(error => console.log(error));
+        
     },
-    edit: function(req,res) {
+   
+    edit: function(req, res) {
+        let movie = db.Movie.findByPk(req.params.id);
+        
+        let allGenres = db.Genre.findAll({
+            order : ['name']
+        })
+       
+        Promise.all([allGenres,movie])
+            .then(([allGenres,movie]) =>{
+                return res.render('moviesEdit',{
+                    allGenres,
+                    Movie : movie,
+                    moment,
+                })
+            })
+            .catch(error => console.log(error));
 
     },
     update: function (req,res) {
+        db.Movie.update(
+            {
+                ...req.body,
+            },
+            {
+                where: {
+                    id : req.params.id
+                }
+            }
+        )
+            .then(result => {
+                console.log('>>>>>>>>>', result)
+                res.redirect('/movies/detail/' + req.params.id)
+            })
+            .catch(error => console.log(error));
 
     },
     delete: function (req,res) {
+        db.Movie.findByPk(req.params.id)
+        .then(movie => {
+            return res.render('moviesDelete', {
+                Movie : movie
+            })
+        })
+        .catch(error => console.log(error));
 
     },
     destroy: function (req,res) {
-
+        db.Movie.destroy({
+            where : {
+                id : req.params.id
+            }
+        })
+            .then(result => {
+                console.log('>>>>>>>', result)
+                return res.redirect('/movies')
+            })
+            .catch(error => console.log(error));
     }
+
+    
 }
 
 module.exports = moviesController;
